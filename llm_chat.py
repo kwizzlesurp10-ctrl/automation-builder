@@ -26,6 +26,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -177,7 +178,41 @@ CRITICAL RULES:
 
     def _parse_actions(self, text: str) -> List[Dict[str, Any]]:
         actions = []
-        for line in text.strip().splitlines():
+        clean_text = text.strip()
+
+        # 1. Try extracting from markdown JSON blocks
+        if "```json" in clean_text:
+            matches = re.findall(r"```json\s*(.*?)\s*```", clean_text, re.DOTALL)
+            for m in matches:
+                try:
+                    parsed = json.loads(m)
+                    if isinstance(parsed, dict) and "action" in parsed:
+                        actions.append(parsed)
+                    elif isinstance(parsed, list):
+                        for item in parsed:
+                            if isinstance(item, dict) and "action" in item:
+                                actions.append(item)
+                except Exception:
+                    pass
+            if actions:
+                return actions
+
+        # 2. Try parsing the entire text as raw JSON
+        try:
+            parsed = json.loads(clean_text)
+            if isinstance(parsed, dict) and "action" in parsed:
+                return [parsed]
+            elif isinstance(parsed, list):
+                return [
+                    item
+                    for item in parsed
+                    if isinstance(item, dict) and "action" in item
+                ]
+        except Exception:
+            pass
+
+        # 3. Fallback: Parse line-by-line (for models that output one flat object per line)
+        for line in clean_text.splitlines():
             line = line.strip()
             if line.startswith("{"):
                 try:
