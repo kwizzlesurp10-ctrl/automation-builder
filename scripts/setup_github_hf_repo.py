@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-Automated GitHub repository setup for huggingface-local-models
+Automated GitHub repository setup for huggingface-local-models (temporary bootstrap name)
 using the live browser connector (CDP).
+
+NOTE: "huggingface-local-models" was the original temporary name used while bootstrapping
+this repository. The project was later renamed to "automation-builder".
 
 This script will:
 1. Navigate to GitHub new repo page
-2. Fill in repository details for "huggingface-local-models"
+2. Fill in repository details for the target repository
 3. Create the repository
 4. Add topics and improve the repo page
 
@@ -19,9 +22,9 @@ from browser_connector import WebBrowserConnector
 import time
 import os
 
-def setup_huggingface_local_models_repo():
+def bootstrap_repository():  # Originally setup_huggingface_local_models_repo()
     print("=" * 60)
-    print("Starting GitHub repo setup for huggingface-local-models")
+    print("Starting GitHub repo setup (historical bootstrap script)")
     print("=" * 60)
 
     conn = WebBrowserConnector(
@@ -50,13 +53,13 @@ def setup_huggingface_local_models_repo():
         try:
             # Current GitHub selector (verified via live inspection)
             name_input = conn.page.locator("#repository-name-input").first
-            name_input.fill("huggingface-local-models")
-            print("  Repository name set to: huggingface-local-models")
+            name_input.fill("automation-builder")
+            print("  Repository name set to target (originally used temp name during creation)")
         except Exception as e:
             print(f"  Error filling name: {e}")
             print("  Trying fallback selector...")
             try:
-                conn.page.locator('input[aria-describedby*="repository-name"]').first.fill("huggingface-local-models")
+                conn.page.locator('input[aria-describedby*="repository-name"]').first.fill("automation-builder")
             except:
                 pass
 
@@ -138,7 +141,7 @@ def setup_huggingface_local_models_repo():
         time.sleep(6)
 
         current_url = conn.get_url()
-        if "/huggingface-local-models" in current_url:
+        if "/automation-builder" in current_url:
             print(f"  SUCCESS! Repo created at: {current_url}")
             snap("05_repo_created_success")
         else:
@@ -149,8 +152,8 @@ def setup_huggingface_local_models_repo():
         print("\n[6/6] Adding repository topics and improving the page...")
         try:
             # Go to the repo page if not already there
-            if "huggingface-local-models" not in current_url:
-                conn.goto("https://github.com/YOUR_USERNAME/huggingface-local-models")  # Will need username
+            if "/automation-builder" not in current_url:
+                conn.goto("https://github.com/YOUR_USERNAME/automation-builder")  # Will need username
 
             # Click "Manage topics" or similar (GitHub UI varies)
             time.sleep(2)
@@ -160,11 +163,11 @@ def setup_huggingface_local_models_repo():
                 time.sleep(1)
                 # Add common topics
                 topics_input = conn.page.locator('input[placeholder*="Add a topic"]').first
-                for topic in ["huggingface", "llm", "local-llm", "llama.cpp", "ollama", "machine-learning"]:
+                for topic in ["huggingface", "llm", "local-llm", "llama.cpp", "ollama", "machine-learning", "browser-automation", "llm-agent"]:
                     topics_input.fill(topic)
                     topics_input.press("Enter")
                     time.sleep(0.3)
-                print("  Topics added: huggingface, llm, local-llm, etc.")
+                print("  Topics added.")
             snap("06_topics_added")
         except Exception as e:
             print(f"  Post-creation steps had issues (common with dynamic GitHub UI): {e}")
@@ -183,4 +186,4 @@ def setup_huggingface_local_models_repo():
         raise
 
 if __name__ == "__main__":
-    setup_huggingface_local_models_repo()
+    bootstrap_repository()  # Originally setup_huggingface_local_models_repo()
