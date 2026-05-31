@@ -96,7 +96,7 @@ class LLMBrowserAgent:
     def _build_system_prompt(self) -> str:
         vision_rule = ""
         if self.is_vision_model:
-            vision_rule = "\n5. VISION CAPABILITY: You receive actual images when you call `screenshot`. CRITICAL: Cross-reference the output of `list_keyboard_shortcuts` with your visual understanding of the UI to map visual buttons/icons directly to robust keyboard commands."
+            vision_rule = "\n5. VISION CAPABILITY: A screenshot is AUTOMATICALLY captured and provided to you after every action. You do not need to call `screenshot`. CRITICAL: Cross-reference the output of `list_keyboard_shortcuts` with your visual understanding of the UI to map visual buttons directly to robust keyboard commands."
 
         return f"""You are an expert browser automation agent controlling a real logged-in Chrome browser using the Automation Builder toolkit.
 
@@ -278,6 +278,19 @@ CRITICAL RULES:
                         method(**args)
                 result["observation"] = f"Executed '{act}'."
 
+            # Auto-capture screenshot for vision models if state likely changed
+            if self.is_vision_model and act not in (
+                "screenshot",
+                "list_keyboard_shortcuts",
+            ):
+                # Brief pause for animations/rendering before snapping
+                time.sleep(0.5)
+                try:
+                    result["image_base64"] = self._get_screenshot_base64()
+                    result["observation"] += " [Auto-screenshot captured]"
+                except Exception:
+                    pass
+
             return result
 
         except Exception as e:
@@ -296,9 +309,43 @@ CRITICAL RULES:
         self.conversation = [{"role": "system", "content": self.system_prompt}]
 
         state = f"Current URL: {self.conn.get_url()}\nTitle: {self.conn.get_title()}"
-        self.conversation.append(
-            {"role": "user", "content": f"Initial browser state:\n{state}"}
-        )
+        if self.is_vision_model:
+            try:
+                b64 = self._get_screenshot_base64()
+                if self.backend == "ollama":
+                    self.conversation.append(
+                        {
+                            "role": "user",
+                            "content": f"Initial browser state:\n{state}\n[Auto-screenshot captured]",
+                            "images": [b64],
+                        }
+                    )
+                else:
+                    self.conversation.append(
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": f"Initial browser state:\n{state}\n[Auto-screenshot captured]",
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{b64}"
+                                    },
+                                },
+                            ],
+                        }
+                    )
+            except Exception:
+                self.conversation.append(
+                    {"role": "user", "content": f"Initial browser state:\n{state}"}
+                )
+        else:
+            self.conversation.append(
+                {"role": "user", "content": f"Initial browser state:\n{state}"}
+            )
 
         while True:
             try:
