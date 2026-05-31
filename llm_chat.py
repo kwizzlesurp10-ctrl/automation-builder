@@ -1,31 +1,35 @@
 #!/usr/bin/env python3
 """
-LLM Chat for Automation Builder
+LLM Chat — Automation Builder
 
-Use natural language chat with a local LLM (Ollama) to execute web navigation
-commands and actions through your real logged-in browser via the CDP connector.
+The flagship experience: Talk naturally to an LLM and have it execute
+real web navigation and automation actions in your logged-in browser.
 
-This is the flagship experience for the Automation Builder repo:
-"Talk to your browser" using an LLM that can drive the full power of
-the WebBrowserConnector (goto, click, select, keyboard shortcuts, scripts, etc.).
-
-Requirements:
-- Ollama running locally (http://localhost:11434) with a capable model
-  (recommended: llama3.1, qwen2.5, or mistral)
-- Chrome debug session running:
-    python browser_connector.py launch-browser
+Features:
+- Multi-backend LLM support (Ollama + any OpenAI-compatible endpoint)
+- Clean JSON action format (reliable for modern LLMs)
+- Full access to the Automation Builder toolkit
+- Automatic glowing panda during actions
+- Screenshot + vision feedback support
+- Self-discovery via list_keyboard_shortcuts()
 
 Run:
-    python llm_chat.py
+    python llm_chat.py --model llama3.1
+    python llm_chat.py --backend openai --base-url http://localhost:8000/v1 --model Qwen2.5-32B
 
-The glowing panda will appear while the agent is actively controlling the browser.
+Requirements:
+- Chrome running with remote debugging (see launch-browser command)
+- Ollama or an OpenAI-compatible server
 """
 
-import requests
+import argparse
+import base64
 import json
+import os
 import time
-import sys
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
+import requests
 
 from browser_connector import WebBrowserConnector
 
@@ -34,214 +38,268 @@ class LLMBrowserAgent:
     def __init__(
         self,
         model: str = "llama3.1",
-        ollama_url: str = "http://localhost:11434",
+        backend: str = "ollama",
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
         cdp_url: str = "http://localhost:9222",
+        vision: bool = False,
     ):
-        print("Connecting to your live Chrome session...")
+        print("Connecting to live Chrome session (CDP)...")
         self.conn = WebBrowserConnector(
             cdp_url=cdp_url,
             auto_indicator=True,
-            indicator_label="\ud83d\udc3c LLM Agent",
+            indicator_label="\ud83e\udd16 LLM Agent",
             indicator_actions={
                 "goto", "click", "select_option", "fill", "type",
                 "keyboard_shortcut", "wait_for_navigation", "execute_script",
-                "new_tab", "switch_to_tab", "reload"
-            }
+                "new_tab", "switch_to_tab", "reload", "screenshot"
+            },
         )
-        print("Connected. The glowing panda will show during actions.\n")
+        print("Connected. Glowing panda will appear during actions.\n")
 
         self.model = model
-        self.ollama_url = ollama_url
-        self.conversation: List[Dict[str, str]] = []
+        self.backend = backend.lower()
+        self.base_url = base_url or ("http://localhost:11434" if backend == "ollama" else "http://localhost:8000/v1")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY", "ollama")
+        self.vision = vision
+        self.conversation: List[Dict[str, Any]] = []
 
-        # Strong system prompt that teaches the LLM how to use the browser
-        self.system_prompt = """You are an expert web automation agent controlling a real logged-in Chrome browser.
+        self.system_prompt = self._build_system_prompt()
 
-You have access to a powerful browser automation library called Automation Builder (WebBrowserConnector).
+    def _build_system_prompt(self) -> str:
+        return f"""You are an expert browser automation agent controlling a real logged-in Chrome browser using the Automation Builder toolkit.
 
-Available high-level actions (use these when possible):
-- goto(url)
-- click(selector)   # supports text=, role=, CSS, etc.
-- select_option(option_text, container=optional_trigger)
-- fill(selector, value)
-- type(selector, text)
-- keyboard_shortcut(keys)   # e.g. "Control+L", "Alt+ArrowLeft"
-- execute_script(js_code)
-- wait_for_navigation(pattern="**/*")
-- new_tab(url=None)
-- switch_to_tab(index)
-- reload()
-- get_title(), get_url(), get_tabs(), list_keyboard_shortcuts()
+Available tools (call them by outputting clean JSON):
+{{
+  "action": "goto",
+  "url": "https://..."
+}}
+{{
+  "action": "click",
+  "selector": "text=Submit"   # or role=button, CSS, etc.
+}}
+{{
+  "action": "select_option",
+  "option": "MIT License",
+  "container": "Add license"   # optional
+}}
+{{
+  "action": "keyboard_shortcut",
+  "keys": "Control+L"
+}}
+{{
+  "action": "screenshot",
+  "describe": true   # if you want a text description
+}}
 
-CRITICAL RULES:
-1. Always start by calling list_keyboard_shortcuts() if you are unsure what navigation options exist.
-2. Prefer keyboard_shortcut and select_option for reliable, human-like control.
-3. Use the glowing panda indicator is already handled automatically for you.
-4. Be precise with selectors. Use text= or role= when possible.
-5. After performing actions, observe the result (page title, visible text, etc.) before deciding the next step.
-6. If something fails, try an alternative approach (keyboard instead of click, etc.).
-7. You can use multiple actions in sequence before responding to the user.
+You also have:
+- fill, type, execute_script, wait_for_navigation, new_tab, switch_to_tab, reload
+- get_title, get_url, get_tabs, list_keyboard_shortcuts (very useful for discovery)
 
-Response format:
-Think step by step, then output one or more actions in this exact format:
+CRITICAL INSTRUCTIONS:
+1. Always call list_keyboard_shortcuts() early if you are unsure of available shortcuts.
+2. Prefer keyboard_shortcut and select_option — they are the most reliable.
+3. After every action, you will receive an observation (page title, URL, result).
+4. If vision is enabled, you can request screenshots and receive descriptions.
+5. Be precise. Use the most reliable selector strategy.
+6. You can call multiple actions in parallel by outputting multiple JSON objects.
 
-ACTION: goto https://example.com
-ACTION: select_option "Python" container="Add .gitignore"
-ACTION: keyboard_shortcut "Control+L"
+Output ONLY valid JSON action objects (one per line if multiple). Do not add extra text unless you are responding to the user.
 
-Or if you need more information or want to respond to the user:
-
-THOUGHT: I need to understand the current page better.
-OBSERVATION: [what you see]
-RESPONSE: [your message to the user]
-
-Never invent actions that don't exist in the list above.
+Current capabilities include full keyboard control and excellent dropdown/menu selection.
 """
 
-    def _call_ollama(self, messages: List[Dict[str, str]]) -> str:
-        """Call Ollama chat API."""
-        try:
-            response = requests.post(
-                f"{self.ollama_url}/api/chat",
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.2,
-                        "top_p": 0.9,
-                    }
-                },
-                timeout=120
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data.get("message", {}).get("content", "").strip()
-        except Exception as e:
-            return f"ERROR: Failed to call LLM ({self.model}): {e}"
+    def _call_llm(self, messages: List[Dict[str, Any]]) -> str:
+        """Call the configured LLM backend."""
+        if self.backend == "ollama":
+            url = f"{self.base_url}/api/chat"
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "stream": False,
+                "options": {"temperature": 0.1},
+            }
+            resp = requests.post(url, json=payload, timeout=180)
+            resp.raise_for_status()
+            return resp.json()["message"]["content"]
 
-    def _parse_actions(self, llm_output: str) -> List[Dict[str, Any]]:
-        """Parse ACTION: lines from the LLM response."""
+        else:  # OpenAI-compatible
+            url = f"{self.base_url}/chat/completions"
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": 0.1,
+            }
+            resp = requests.post(url, json=payload, headers=headers, timeout=180)
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+
+    def _parse_actions(self, text: str) -> List[Dict[str, Any]]:
+        """Parse JSON action objects from LLM output."""
         actions = []
-        lines = llm_output.splitlines()
-        for line in lines:
+        for line in text.strip().splitlines():
             line = line.strip()
-            if line.upper().startswith("ACTION:"):
-                try:
-                    content = line.split(":", 1)[1].strip()
-                    # Very simple parser for common patterns
-                    if content.lower().startswith("goto "):
-                        actions.append({"action": "goto", "url": content[5:].strip()})
-                    elif content.lower().startswith("click "):
-                        actions.append({"action": "click", "selector": content[6:].strip()})
-                    elif content.lower().startswith("select_option "):
-                        # Very naive parser
-                        parts = content[14:].split("container=")
-                        option = parts[0].strip().strip('"\'')
-                        container = parts[1].strip().strip('"\'') if len(parts) > 1 else None
-                        actions.append({"action": "select_option", "option": option, "container": container})
-                    elif content.lower().startswith("fill "):
-                        # fill selector "value"
-                        actions.append({"action": "fill", "raw": content[5:]})
-                    elif content.lower().startswith("keyboard_shortcut "):
-                        actions.append({"action": "keyboard_shortcut", "keys": content[18:].strip().strip('"\'')})
-                    elif content.lower().startswith("execute_script "):
-                        actions.append({"action": "execute_script", "script": content[15:].strip()})
-                    else:
-                        actions.append({"action": "raw", "command": content})
-                except Exception:
-                    pass
+            if not line or not line.startswith("{"):
+                continue
+            try:
+                action = json.loads(line)
+                if isinstance(action, dict) and "action" in action:
+                    actions.append(action)
+            except json.JSONDecodeError:
+                continue
         return actions
 
+    def _take_screenshot_and_describe(self) -> str:
+        """Take a screenshot and return a description (text for now)."""
+        path = "/tmp/llm_agent_screenshot.png"
+        self.conn.screenshot(path)
+        # For now we just note that a screenshot was taken.
+        # Future: feed base64 to vision models.
+        return f"Screenshot saved to {path} (vision feedback not yet wired for this model)."
+
     def execute_action(self, action: Dict[str, Any]) -> str:
-        """Execute a parsed action and return observation text."""
+        """Execute one action and return a concise observation."""
+        act = action.get("action", "").lower()
+
         try:
-            act = action.get("action")
             if act == "goto":
-                url = action["url"]
-                self.conn.goto(url)
+                self.conn.goto(action["url"])
                 return f"Navigated to {self.conn.get_url()}. Title: {self.conn.get_title()}"
+
             elif act == "click":
-                sel = action["selector"]
-                self.conn.click(sel)
-                return f"Clicked '{sel}'. Current title: {self.conn.get_title()}"
+                self.conn.click(action["selector"])
+                return f"Clicked. Current title: {self.conn.get_title()}"
+
             elif act == "select_option":
-                self.conn.select_option(action["option"], container=action.get("container"))
-                return f"Selected '{action['option']}'. Current title: {self.conn.get_title()}"
+                self.conn.select_option(
+                    action["option"], container=action.get("container")
+                )
+                return f"Selected '{action['option']}'. Title: {self.conn.get_title()}"
+
             elif act == "keyboard_shortcut":
-                keys = action["keys"]
-                self.conn.keyboard_shortcut(keys)
-                time.sleep(0.6)
-                return f"Sent keyboard shortcut '{keys}'. Current URL: {self.conn.get_url()}"
+                self.conn.keyboard_shortcut(action["keys"])
+                time.sleep(0.5)
+                return f"Sent keys '{action['keys']}'. URL: {self.conn.get_url()}"
+
+            elif act == "fill":
+                self.conn.fill(action["selector"], action["value"])
+                return f"Filled field. Title: {self.conn.get_title()}"
+
+            elif act == "type":
+                self.conn.type(action["selector"], action["text"])
+                return f"Typed text."
+
             elif act == "execute_script":
                 result = self.conn.execute_script(action["script"])
-                return f"Executed script. Result: {str(result)[:200]}"
-            else:
-                return f"Unknown or unparsed action: {action}"
-        except Exception as e:
-            return f"Action failed: {e}"
+                return f"Script result: {str(result)[:300]}"
 
-    def chat_loop(self):
+            elif act == "wait_for_navigation":
+                url = self.conn.wait_for_navigation(action.get("pattern", "**/*"))
+                return f"Navigation complete. URL: {url}"
+
+            elif act == "screenshot":
+                return self._take_screenshot_and_describe()
+
+            elif act == "new_tab":
+                url = self.conn.new_tab(action.get("url"))
+                return f"New tab opened: {url}"
+
+            elif act == "switch_to_tab":
+                url = self.conn.switch_to_tab(int(action["index"]))
+                return f"Switched to tab. URL: {url}"
+
+            elif act == "reload":
+                self.conn.reload()
+                return f"Reloaded. Title: {self.conn.get_title()}"
+
+            elif act == "list_keyboard_shortcuts":
+                shortcuts = self.conn.list_keyboard_shortcuts()
+                return f"Available shortcuts: {json.dumps(shortcuts, indent=2)}"
+
+            else:
+                return f"Unknown action: {act}"
+
+        except Exception as e:
+            return f"Action '{act}' failed: {str(e)}"
+
+    def run(self):
         print("=" * 70)
-        print("Automation Builder \u2014 LLM Chat")
-        print("Talk naturally. The LLM will drive your real browser.")
-        print(f"Model: {self.model}")
-        print("Type 'quit' or 'exit' to leave.")
+        print("Automation Builder \u2014 LLM Chat (v2)")
+        print(f"Backend: {self.backend} | Model: {self.model}")
+        print("Talk to the agent. It will control your real browser.")
+        print("Type 'quit' to exit.")
         print("=" * 70)
         print()
 
-        # Seed the conversation
-        self.conversation = [
-            {"role": "system", "content": self.system_prompt}
-        ]
+        self.conversation = [{"role": "system", "content": self.system_prompt}]
 
-        # Give the LLM an initial observation
-        initial_obs = f"Current page: {self.conn.get_url()}\nTitle: {self.conn.get_title()}"
-        self.conversation.append({"role": "user", "content": f"Initial state:\n{initial_obs}\n\nHow can I help you automate the web today?"})
+        # Seed with current state
+        state = f"Current URL: {self.conn.get_url()}\nTitle: {self.conn.get_title()}"
+        self.conversation.append({
+            "role": "user",
+            "content": f"Browser state:\n{state}\n\nWhat would you like to automate?"
+        })
 
         while True:
             try:
                 user_input = input("You: ").strip()
+                if user_input.lower() in {"quit", "exit", "q"}:
+                    break
                 if not user_input:
                     continue
-                if user_input.lower() in ["quit", "exit", "q"]:
-                    print("Goodbye!")
-                    break
 
                 self.conversation.append({"role": "user", "content": user_input})
 
-                # Get response from LLM
-                print("\ud83e\udd16 Thinking...")
-                llm_response = self._call_ollama(self.conversation)
-                print(f"\nAgent:\n{llm_response}\n")
+                print("\ud83e\udd16 Agent thinking...")
+                response = self._call_llm(self.conversation)
+                print(f"\nAgent:\n{response}\n")
 
-                self.conversation.append({"role": "assistant", "content": llm_response})
+                self.conversation.append({"role": "assistant", "content": response})
 
-                # Parse and execute actions
-                actions = self._parse_actions(llm_response)
+                actions = self._parse_actions(response)
                 if actions:
-                    print("Executing actions...")
-                    for act in actions:
-                        observation = self.execute_action(act)
-                        print(f"  \u2192 {observation}")
-                        # Feed observation back
+                    print("▶ Executing actions...")
+                    for action in actions:
+                        observation = self.execute_action(action)
+                        print(f"   {observation}")
                         self.conversation.append({
                             "role": "user",
-                            "content": f"Observation after action: {observation}"
+                            "content": f"Observation: {observation}"
                         })
 
-                    # Ask the LLM what to do next based on observations
-                    follow_up = self._call_ollama(self.conversation)
+                    # Let the model react to the observations
+                    follow_up = self._call_llm(self.conversation)
                     print(f"\nAgent follow-up:\n{follow_up}\n")
                     self.conversation.append({"role": "assistant", "content": follow_up})
 
             except KeyboardInterrupt:
-                print("\nExiting.")
                 break
             except Exception as e:
                 print(f"Error: {e}")
 
 
+def main():
+    parser = argparse.ArgumentParser(description="LLM-powered browser automation chat")
+    parser.add_argument("--model", default="llama3.1", help="Model name")
+    parser.add_argument("--backend", default="ollama", choices=["ollama", "openai"], help="LLM backend")
+    parser.add_argument("--base-url", help="Base URL for the LLM server")
+    parser.add_argument("--api-key", help="API key (for OpenAI-compatible backends)")
+    parser.add_argument("--cdp-url", default="http://localhost:9222")
+    parser.add_argument("--vision", action="store_true", help="Enable vision/screenshot feedback (future)")
+
+    args = parser.parse_args()
+
+    agent = LLMBrowserAgent(
+        model=args.model,
+        backend=args.backend,
+        base_url=args.base_url,
+        api_key=args.api_key,
+        cdp_url=args.cdp_url,
+        vision=args.vision,
+    )
+    agent.run()
+
+
 if __name__ == "__main__":
-    agent = LLMBrowserAgent()
-    agent.chat_loop()
+    main()

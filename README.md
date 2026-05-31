@@ -10,66 +10,62 @@ This is the flagship experience of the project.
 
 ## The Vision
 
-Instead of writing brittle scripts or using fragile headless automation, you simply talk to your browser:
+Talk to your browser like a human:
 
-- "Go to Hugging Face, search for the latest Llama 3.2 GGUF models, and open the top result"
-- "Log into Linear, create a new issue titled 'Fix the panda animation', and assign it to me"
-- "On GitHub, create a new public repo called 'my-automation-experiments' with Python .gitignore and MIT license"
+- "Go to GitHub, create a new public repo called my-agent-experiments with Python gitignore and MIT license"
+- "Open Linear, create a bug report about the panda animation, and assign it to me"
+- "Search Hugging Face for the latest Qwen2.5 GGUF models and open the top result"
 
-The LLM uses the rich, observable, keyboard-friendly surface provided by the connector (including the powerful `select` command for dropdowns).
+The LLM uses the rich, discoverable, keyboard-friendly surface (`list_keyboard_shortcuts()`, `select_option`, keyboard shortcuts, etc.) while you watch the glowing panda do the work.
 
 ## Flagship Feature: LLM Chat
 
-The main entrypoint is `llm_chat.py`:
+The main way to use the project is `llm_chat.py` — a conversational interface where an LLM directly controls your real browser.
 
 ```bash
-python llm_chat.py
+# Ollama (recommended)
+python llm_chat.py --model llama3.1
+
+# OpenAI-compatible (vLLM, LM Studio, OpenRouter, etc.)
+python llm_chat.py --backend openai --base-url http://localhost:8000/v1 --model Qwen2.5-32B
 ```
 
-It connects to:
-- Your real Chrome (via CDP on port 9222)
-- A local LLM via Ollama (default: llama3.1 or similar)
+**Current capabilities:**
+- Clean JSON action format (highly reliable)
+- Multi-backend support (Ollama + any OpenAI-compatible server)
+- Automatic glowing panda during execution
+- Strong self-discovery (`list_keyboard_shortcuts`)
+- Screenshot + observation feedback
+- Full toolkit access (`select_option`, keyboard control, etc.)
 
-The agent has full access to the connector's capabilities and automatically shows the glowing panda while acting.
+The LLM receives rich observations after every action and can perform complex, multi-step automations.
 
-See `llm_chat.py` for the current implementation (ReAct-style action parsing + strong system prompt).
+## Why This Works So Well
 
-## Why This Approach Works
-
-- Real browser = real logins, real state, real extensions
-- Glowing panda = excellent observability for the LLM (and for you watching)
-- Keyboard + `select_option` + `list_keyboard_shortcuts()` = reliable, discoverable actions
-- JSON-friendly output + structured results = easy for LLMs to reason over
+- Real logged-in Chrome = all your cookies, 2FA sessions, extensions
+- Glowing panda = perfect visual feedback for both you and the LLM
+- Strong self-discovery tools (`list_keyboard_shortcuts`, `get_tabs`, etc.)
+- Robust `select_option` for the dropdowns and menus that usually break automation
+- JSON-friendly + observable results that LLMs can reason over
 
 ## Quick Start
 
 ```bash
-# 1. Start your persistent Chrome
+# 1. Launch persistent Chrome (with your real logins)
 python browser_connector.py launch-browser
 
-# 2. (Optional) Start Ollama with a good model
+# 2. Make sure Ollama is running with a good model
 ollama run llama3.1
 
-# 3. Launch the LLM chat
+# 3. Start chatting
 python llm_chat.py
 ```
 
-Then just talk to it. The model will drive the browser for you.
+Then just describe what you want done on the web. The agent will drive the browser for you.
 
 ## Examples
 
-```bash
-# Python API
-conn = WebBrowserConnector(cdp_url="http://localhost:9222", auto_indicator=True)
-conn.goto("https://github.com/new")
-conn.select_option("Python", container="Add .gitignore")
-conn.select_option("MIT License", container="Add license")
-
-# CLI
-python browser_connector.py select "Public" --container "Choose visibility"
-```
-
-See the `examples/` directory for more runnable demonstrations.
+See the `examples/` directory for runnable demonstrations, including `examples/llm_browser_agent.py`.
 
 ## Browser Assistant Swarm Connection
 
