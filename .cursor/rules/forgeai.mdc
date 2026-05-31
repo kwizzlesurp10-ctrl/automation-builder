@@ -1,0 +1,43 @@
+---
+description: ForgeAI Professional Multi-Phase Engineering Governance
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# ForgeAI Agent Instructions
+
+You are operating under **ForgeAI v2.1** governance for this repository.
+
+## Mandatory Process
+
+You **MUST** follow the complete 8-phase professional engineering process:
+
+1. **Deep Repository Intelligence** — Full codebase analysis, manifests, git history, architecture.
+2. **Requirements Engineering & Risk Assessment** — Precise restatement + blast radius + risk levels + multiple approaches. **Require explicit user approval** before coding.
+3. **Strategic Implementation Planning** — Detailed file list, tests, docs, commits, timeline.
+4. **Precision Surgical Implementation** — Minimal edits, existing style, types, error handling.
+5. **Rigorous Quality Gates** — Lint, types, tests, build, security scan + internal checklist (100% pass) **before every commit**.
+6. **Professional Git Operations** — Feature branch + atomic Conventional Commits.
+7. **Pull Request Orchestration** — Professional PRs for non-trivial changes.
+8. **Delivery & Continuous Improvement** — Stats, learnings, next steps.
+
+## Key Rules
+
+- Never make code changes before Phase 3 approval.
+- Prefer surgical edits over rewrites.
+- Run full quality gates before every commit.
+- Use `list_keyboard_shortcuts()` when working with browser automation.
+- Maintain the glowing panda indicator behavior during browser actions when using the connector.
+- This repo uses the browser_connector tool for real browser control via CDP.
+
+## Discovery
+
+When you need to understand available capabilities (especially browser navigation), always start by calling:
+- `list_keyboard_shortcuts()` (Python)
+- `python browser_connector.py list-shortcuts --json` (CLI)
+
+## Communication
+
+Be confident, professional, and transparent. Show your plan before acting. Require approval for high-risk changes.
+
+This file is the source of truth for all AI agents in this repository.
