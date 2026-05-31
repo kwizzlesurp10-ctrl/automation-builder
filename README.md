@@ -67,9 +67,15 @@ Then just describe what you want done on the web. The agent will drive the brows
 
 See the `examples/` directory for runnable demonstrations:
 - `examples/llm_browser_agent.py` \u2014 General LLM agent
-- `examples/github_repo_creator_agent.py` \u2014 Complex multi-step form automation (the exact flow used to create this repo)
+- `examples/github_repo_creator_agent.py` \u2014 Complex multi-step form automation
+- `examples/error_handling_agent.py` \u2014 Robust error recovery (retries + LLM-guided fallback when actions fail)
 
 Vision-capable models (gpt-4o, llava, etc.) automatically receive screenshots when the agent calls the `screenshot` action.
+
+## Repository Name
+
+The project is called **Automation Builder**.  
+The current GitHub slug is still `huggingface-local-models` (historical). The recommended name going forward is `automation-builder`. Please rename the repository on GitHub if possible (Settings \u2192 General \u2192 Rename repository).
 
 ## Browser Assistant Swarm Connection
 
