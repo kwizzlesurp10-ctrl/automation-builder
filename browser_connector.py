@@ -478,8 +478,9 @@ class WebBrowserConnector:
         """
         Return a structured dictionary of all supported keyboard shortcuts.
         Extremely useful for agents/Grok to discover what navigation actions are available.
+        Dynamically sniffs for site-specific SPA shortcuts (e.g. data-hotkey).
         """
-        return {
+        browser_shortcuts = {
             "address_bar": "Control+L or Meta+L",
             "new_tab": "Control+T or Meta+T",
             "close_tab": "Control+W or Meta+W",
@@ -502,6 +503,32 @@ class WebBrowserConnector:
             "zoom_in": "Control+Plus or Meta+Plus",
             "zoom_out": "Control+Minus or Meta+Minus",
             "zoom_reset": "Control+0 or Meta+0",
+        }
+
+        site_shortcuts = {}
+        try:
+            site_shortcuts = self.page.evaluate(
+                """() => {
+                let shortcuts = {};
+                document.querySelectorAll('[data-hotkey]').forEach(el => {
+                    let key = el.getAttribute('data-hotkey');
+                    let label = el.getAttribute('aria-label') || el.title || el.innerText || el.tagName;
+                    shortcuts[key + ' (hotkey)'] = label.trim().substring(0, 60);
+                });
+                document.querySelectorAll('[accesskey]').forEach(el => {
+                    let key = el.getAttribute('accesskey');
+                    let label = el.getAttribute('aria-label') || el.title || el.innerText || el.tagName;
+                    shortcuts['Alt+Shift+' + key + ' (accesskey)'] = label.trim().substring(0, 60);
+                });
+                return shortcuts;
+            }"""
+            )
+        except Exception:
+            pass
+
+        return {
+            "browser_shortcuts": browser_shortcuts,
+            "site_specific_shortcuts": site_shortcuts,
         }
 
     def close_tab(self, index: Optional[int] = None) -> None:
