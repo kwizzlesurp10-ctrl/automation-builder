@@ -1,94 +1,100 @@
-# huggingface-local-models
+# Automation Builder
 
-**Tools, scripts, and a powerful real-browser agent control plane for working with Hugging Face models locally.**
+**Powerful browser automation and agent control plane** — built for real-world, authenticated web tasks.
 
-> Powered by CDP-connected Playwright (your real logged-in Chrome), visual observability (glowing panda), keyboard-level control, and swarm-style agent patterns inspired by [browser-assistant-swarm](https://github.com/kwizzlesurp10-ctrl/browser-assistant-swarm).
+> Powered by **CDP-connected Playwright** (your real logged-in Chrome), **visual observability** (glowing panda), **keyboard-level control**, and **swarm-style agent patterns** inspired by [browser-assistant-swarm](https://github.com/kwizzlesurp10-ctrl/browser-assistant-swarm).
 
-This repository was created by its own tooling (see `scripts/setup_github_hf_repo.py`).
+This project gives AI agents (and humans) reliable, observable, keyboard-and-mouse-level control over a real user's already-logged-in browser — without managing credentials yourself.
 
-## Why This Exists
+## Why Automation Builder?
 
-Local inference (llama.cpp, Ollama, GGUF, Transformers.js, etc.) is powerful, but many real workflows still require reliable, authenticated, observable interaction with the web (HF Hub, model cards, Spaces, GitHub, Drive, papers, leaderboards).
+Most browser automation tools are either:
+- Headless and fragile (no real logins, no extensions, no state)
+- Or too low-level for agents
 
-This project delivers both:
+Automation Builder solves this by combining:
 
-1. **Local HF model tooling** (GGUF discovery, quant selection, server runners, conversion, OpenAI-compatible serving, etc.)
-2. **A production-grade browser agent control plane** that any local LLM or LangGraph-style agent can drive against your real browser sessions.
+- **Real logged-in browser** via Chrome DevTools Protocol (CDP)
+- **Strong observability** with the glowing panda indicator (active + searching modes)
+- **Human-like control** through rich keyboard shortcuts + self-discovery (`list_keyboard_shortcuts()`)
+- **Robust interaction** including the powerful `select` command for dropdowns, menus, and custom lists
+- **Agent-friendly API + CLI** with JSON output, auto-indicator, and tab management
 
-## The Browser Control Plane (Core IP)
+Perfect for building sophisticated automation agents, research tools, workflow builders, or swarm-style multi-agent systems that need to interact with the real web.
 
-Located in the root Python package + CLI:
+## Core Capabilities
 
-- `browser_connector.py` — `WebBrowserConnector` with CDP support for persistent real Chrome
-- Full tab management, `execute_script`, `wait_for_navigation`
-- **New: `select` command** — robust click-to-select for dropdowns, menus, and custom lists (the real pattern for GitHub forms, ARIA popovers, etc.)
-- Rich keyboard shortcuts + `list_keyboard_shortcuts()` self-discovery for agents
-- Visual glowing 🐼 panda indicator (active + searching animation) with configurable auto-trigger
-- `--cdp` / auto-detect + persistent profile support
-- `drive_chat.py` example of natural-language conversational control
-- Robust against real production UIs (used to create this repo itself on GitHub)
+- **CDP Real Browser Control** — Attach to your persistent Chrome profile (with all your logins)
+- **Glowing Panda Indicator** — Visual feedback when the agent is actively controlling the browser (configurable auto-trigger on actions like `goto`, `click`, `select`)
+- **Advanced Selection** — `select_option()` / CLI `select` command with multi-strategy clicking for modern dropdowns and menus
+- **Full Keyboard Surface** — Dozens of shortcuts + `list_keyboard_shortcuts()` for agent discovery
+- **Tab & Context Management** — Smart reuse, new tabs, switching, close
+- **Scripting Superpowers** — `execute_script`, `wait_for_navigation`, robust locators
+- **CLI + Python API** — Works great both from the terminal and as tools for LLMs/agents
+- **Examples included** — See `examples/` for ready-to-run patterns
 
-See the original development in the sibling `Grok-Playwright-Browser-Connector` work for the full evolution and debugging story.
-
-### Quick Start (Browser Control)
+## Quick Start
 
 ```bash
-# 1. One-time Chrome debug session (persistent profile with your logins)
+# 1. Launch a persistent debug Chrome (one-time)
 python browser_connector.py launch-browser
-# (or manually: google-chrome-stable --remote-debugging-port=9222 --user-data-dir=~/.grok-browser-profile)
 
-# 2. Use it
-python browser_connector.py --cdp status
-python browser_connector.py goto https://huggingface.co
-python browser_connector.py list-shortcuts --json
+# 2. Log into the sites you need in that window
 
-# New: robust click-to-select for dropdowns/menus (used heavily for GitHub form automation)
-python browser_connector.py select "MIT License" --container "Add license"
-python browser_connector.py select "Python" --in "Add .gitignore"
+# 3. Control it from code or CLI
+python browser_connector.py --cdp goto https://github.com
+python browser_connector.py --cdp select "MIT License" --container "Add license"
+python browser_connector.py --cdp list-shortcuts --json
+```
+
+See the full CLI with:
+```bash
+python browser_connector.py --help
 ```
 
 ## Examples
 
-See the `examples/` directory for runnable demonstrations:
+```bash
+# Python API
+conn = WebBrowserConnector(cdp_url="http://localhost:9222", auto_indicator=True)
+conn.goto("https://github.com/new")
+conn.select_option("Python", container="Add .gitignore")
+conn.select_option("MIT License", container="Add license")
 
-- `examples/select_dropdowns.py` — Using the powerful new `select` / `select_option` helper for menus and custom dropdowns.
+# CLI
+python browser_connector.py select "Public" --container "Choose visibility"
+```
 
-## Browser Assistant Swarm Concept
+See the `examples/` directory for more runnable demonstrations.
 
-This repo directly implements and extends ideas from browser-assistant-swarm / OpenComet:
+## Browser Assistant Swarm Inspiration
 
-- Real (not headless) browser as first-class tool for agents
-- Local inference (Ollama + the HF local models in this repo) driving multi-step browser tasks
-- Observable actions (panda + screenshots + structured output)
-- Keyboard + DOM + script surface for reliable control
-- **Click-based selection** (`select` command) for complex form/menu interactions
-- Potential future: LangGraph loops, extension sidepanel, dashboard, memory, and approval gates
+This project draws heavily from the [browser-assistant-swarm](https://github.com/kwizzlesurp10-ctrl/browser-assistant-swarm) / OpenComet architecture:
 
-Future agents running on models from this repo can use the connector as their "eyes and hands" on the authenticated web — including reliable selection in dynamic UIs.
+- Real browser as a first-class tool for agents
+- Strong observability and structured action surface
+- Local inference friendly (works great with Ollama, llama.cpp, etc.)
+- Designed for multi-step, long-horizon automation loops
+
+It serves as an excellent reliable "hands and eyes" backend for swarm-style or LangGraph-based browser agents.
 
 ## ForgeAI Governance
 
-This repository is governed by **ForgeAI v2.1**. All AI agents (Grok, Cursor, Claude, Aider, Copilot, etc.) **must** follow the full 8-phase professional process defined in [AGENTS.md](./AGENTS.md).
+This repository follows **ForgeAI v2.1** professional engineering governance.
 
-Key files:
-- `AGENTS.md` (root)
-- `.github/AGENTS.md`
-- `.cursor/rules/forgeai.mdc`
-- `.forgeai/config.md`
+All AI agents working in this repo must follow the process defined in [AGENTS.md](./AGENTS.md).
 
-## Roadmap Ideas
+## Installation
 
-- GGUF/quant catalog and downloader scripts
-- Local server runners + OpenAI-compatible proxy for models in this repo
-- LangGraph / local-LLM multi-step agent that drives the browser connector for HF Hub research, paper reading, model testing, etc.
-- Chrome extension sidepanel (in the spirit of browser-assistant-swarm)
-- Evaluation harness using the browser control plane
+```bash
+pip install playwright
+playwright install chromium
+```
 
 ## License
 
-MIT (governance and connector code).
+MIT
 
 ---
 
-**Created with Grok + the Playwright CDP connector + live logged-in browser automation.**
-The very automation that built this repo lives inside it.
+**Built with real logged-in browser automation, the glowing panda, and a lot of debugging against production UIs.**
