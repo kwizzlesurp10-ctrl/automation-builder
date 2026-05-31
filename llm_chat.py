@@ -89,6 +89,7 @@ class LLMBrowserAgent:
             "claude-3",
             "qwen2-vl",
             "bakllava",
+            "moondream",
         ]
         model_lower = model.lower()
         return any(kw in model_lower for kw in vision_keywords)
