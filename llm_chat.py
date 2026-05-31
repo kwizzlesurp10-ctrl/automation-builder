@@ -47,18 +47,31 @@ class LLMBrowserAgent:
         self.conn = WebBrowserConnector(
             cdp_url=cdp_url,
             auto_indicator=True,
-            indicator_label="\ud83e\udd16 LLM Agent",
+            indicator_label="🤖 LLM Agent",
             indicator_actions={
-                "goto", "click", "select_option", "fill", "type",
-                "keyboard_shortcut", "wait_for_navigation", "execute_script",
-                "new_tab", "switch_to_tab", "reload", "screenshot"
+                "goto",
+                "click",
+                "select_option",
+                "fill",
+                "type",
+                "keyboard_shortcut",
+                "wait_for_navigation",
+                "execute_script",
+                "new_tab",
+                "switch_to_tab",
+                "reload",
+                "screenshot",
             },
         )
         print("Connected. Glowing panda will appear during actions.\n")
 
         self.model = model
         self.backend = backend.lower()
-        self.base_url = base_url or ("http://localhost:11434" if backend == "ollama" else "http://localhost:8000/v1")
+        self.base_url = base_url or (
+            "http://localhost:11434"
+            if backend == "ollama"
+            else "http://localhost:8000/v1"
+        )
         self.api_key = api_key or os.getenv("OPENAI_API_KEY", "ollama")
         self.conversation: List[Dict[str, Any]] = []
 
@@ -68,7 +81,14 @@ class LLMBrowserAgent:
 
     def _detect_vision_model(self, model: str) -> bool:
         """Heuristic to detect if the model supports vision."""
-        vision_keywords = ["vision", "llava", "gpt-4o", "claude-3", "qwen2-vl", "bakllava"]
+        vision_keywords = [
+            "vision",
+            "llava",
+            "gpt-4o",
+            "claude-3",
+            "qwen2-vl",
+            "bakllava",
+        ]
         model_lower = model.lower()
         return any(kw in model_lower for kw in vision_keywords)
 
@@ -128,6 +148,15 @@ CRITICAL RULES:
                 "options": {"temperature": 0.1},
             }
             resp = requests.post(url, json=payload, timeout=180)
+            if resp.status_code == 404:
+                try:
+                    err_msg = resp.json().get("error", "")
+                    if "not found" in err_msg:
+                        raise ValueError(
+                            f"Ollama error: {err_msg}. Please run 'ollama pull {self.model}' or restart with an installed model (e.g., --model llama3.2)."
+                        )
+                except (ValueError, json.JSONDecodeError):
+                    pass
             resp.raise_for_status()
             return resp.json()["message"]["content"]
 
@@ -152,7 +181,7 @@ CRITICAL RULES:
                     action = json.loads(line)
                     if isinstance(action, dict) and "action" in action:
                         actions.append(action)
-                except:
+                except Exception:
                     pass
         return actions
 
@@ -168,11 +197,17 @@ CRITICAL RULES:
 
             elif act == "click":
                 self.conn.click(action["selector"])
-                result["observation"] = f"Clicked '{action['selector']}'. Title: {self.conn.get_title()}"
+                result["observation"] = (
+                    f"Clicked '{action['selector']}'. Title: {self.conn.get_title()}"
+                )
 
             elif act == "select_option":
-                self.conn.select_option(action["option"], container=action.get("container"))
-                result["observation"] = f"Selected option. Title: {self.conn.get_title()}"
+                self.conn.select_option(
+                    action["option"], container=action.get("container")
+                )
+                result["observation"] = (
+                    f"Selected option. Title: {self.conn.get_title()}"
+                )
 
             elif act == "keyboard_shortcut":
                 self.conn.keyboard_shortcut(action["keys"])
@@ -183,11 +218,15 @@ CRITICAL RULES:
                 if self.is_vision_model:
                     b64 = self._get_screenshot_base64()
                     result["image_base64"] = b64
-                    result["observation"] = "Screenshot captured and provided as image to the model."
+                    result["observation"] = (
+                        "Screenshot captured and provided as image to the model."
+                    )
                 else:
                     path = "/tmp/llm_screenshot.png"
                     self.conn.screenshot(path)
-                    result["observation"] = f"Screenshot saved to {path} (model does not support vision)."
+                    result["observation"] = (
+                        f"Screenshot saved to {path} (model does not support vision)."
+                    )
 
             elif act == "list_keyboard_shortcuts":
                 shortcuts = self.conn.list_keyboard_shortcuts()
@@ -209,7 +248,9 @@ CRITICAL RULES:
     def run(self):
         print("=" * 70)
         print("Automation Builder \u2014 LLM Chat (Vision Enabled)")
-        print(f"Backend: {self.backend} | Model: {self.model} | Vision: {self.is_vision_model}")
+        print(
+            f"Backend: {self.backend} | Model: {self.model} | Vision: {self.is_vision_model}"
+        )
         print("Talk to the agent. It will control your real browser.")
         print("Type 'quit' to exit.")
         print("=" * 70)
@@ -217,7 +258,9 @@ CRITICAL RULES:
         self.conversation = [{"role": "system", "content": self.system_prompt}]
 
         state = f"Current URL: {self.conn.get_url()}\nTitle: {self.conn.get_title()}"
-        self.conversation.append({"role": "user", "content": f"Initial browser state:\n{state}"})
+        self.conversation.append(
+            {"role": "user", "content": f"Initial browser state:\n{state}"}
+        )
 
         while True:
             try:
@@ -229,36 +272,52 @@ CRITICAL RULES:
 
                 self.conversation.append({"role": "user", "content": user_input})
 
-                print("\ud83e\udd16 Agent thinking...")
+                print("🤖 Agent thinking...")
                 response_text = self._call_llm(self.conversation)
                 print(f"\nAgent:\n{response_text}\n")
 
-                self.conversation.append({"role": "assistant", "content": response_text})
+                self.conversation.append(
+                    {"role": "assistant", "content": response_text}
+                )
 
                 actions = self._parse_actions(response_text)
                 for action in actions:
                     obs = self.execute_action(action)
 
                     if "image_base64" in obs:
-                        self.conversation.append({
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": f"Observation after {action['action']}: {obs.get('observation', '')}"},
-                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{obs['image_base64']}"}}
-                            ]
-                        })
+                        self.conversation.append(
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": f"Observation after {action['action']}: {obs.get('observation', '')}",
+                                    },
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/png;base64,{obs['image_base64']}"
+                                        },
+                                    },
+                                ],
+                            }
+                        )
                     else:
-                        self.conversation.append({
-                            "role": "user",
-                            "content": f"Observation after {action.get('action')}: {obs.get('observation', '')}"
-                        })
+                        self.conversation.append(
+                            {
+                                "role": "user",
+                                "content": f"Observation after {action.get('action')}: {obs.get('observation', '')}",
+                            }
+                        )
 
                     print(f"   \u2192 {obs.get('observation', '')}")
 
                 if actions:
                     follow_up = self._call_llm(self.conversation)
                     print(f"\nAgent follow-up:\n{follow_up}\n")
-                    self.conversation.append({"role": "assistant", "content": follow_up})
+                    self.conversation.append(
+                        {"role": "assistant", "content": follow_up}
+                    )
 
             except KeyboardInterrupt:
                 break

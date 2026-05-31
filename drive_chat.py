@@ -16,6 +16,7 @@ from browser_connector import WebBrowserConnector
 import time
 import re
 
+
 class DriveChat:
     def __init__(self):
         print("Connecting to your live Chrome session (port 9222)...")
@@ -23,7 +24,7 @@ class DriveChat:
             cdp_url="http://localhost:9222",
             auto_indicator=True,
             indicator_label="\ud83d\udc3c Drive",
-            indicator_actions={"goto", "click", "fill", "wait_for_navigation"}
+            indicator_actions={"goto", "click", "fill", "wait_for_navigation"},
         )
         print("Connected. The glowing panda will show during Drive actions.\n")
         self._go_to_drive_home()
@@ -34,7 +35,7 @@ class DriveChat:
         # Give Drive time to load its main UI
         try:
             self.conn.wait_for_selector('[role="main"]', timeout=15000)
-        except:
+        except Exception:
             pass
         print("Ready on Google Drive.\n")
 
@@ -62,7 +63,9 @@ class DriveChat:
             self.conn.click('div[aria-label="Folder"]')
 
             # Type the name
-            self.conn.wait_for_selector('input[aria-label*="Folder name"]', timeout=5000)
+            self.conn.wait_for_selector(
+                'input[aria-label*="Folder name"]', timeout=5000
+            )
             self.conn.fill('input[aria-label*="Folder name"]', name)
 
             # Confirm
@@ -87,7 +90,7 @@ class DriveChat:
                     text = item.inner_text().strip()
                     if text:
                         names.append(text.split("\n")[0])
-                except:
+                except Exception:
                     pass
 
             if names:
@@ -100,7 +103,7 @@ class DriveChat:
             print(f"Could not list items: {e}")
 
     def chat_loop(self):
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("Drive Chat is ready!")
         print("Talk to your Google Drive naturally (type 'quit' to exit).")
         print("\nExamples:")
@@ -108,7 +111,7 @@ class DriveChat:
         print("  create folder Projects")
         print("  search for Q3 report")
         print("  go to my drive")
-        print("="*70 + "\n")
+        print("=" * 70 + "\n")
 
         while True:
             try:
@@ -130,7 +133,9 @@ class DriveChat:
     def handle_message(self, message: str):
         msg = message.lower()
 
-        if any(kw in msg for kw in ["list", "show files", "what do i have", "my files"]):
+        if any(
+            kw in msg for kw in ["list", "show files", "what do i have", "my files"]
+        ):
             self.list_visible_items()
 
         elif "create folder" in msg or "make folder" in msg or "new folder" in msg:
@@ -152,11 +157,17 @@ class DriveChat:
             print("Back at the root of My Drive.")
 
         elif "help" in msg:
-            print("Try: 'list files', 'create folder X', 'search for Y', or 'go to my drive'.")
+            print(
+                "Try: 'list files', 'create folder X', 'search for Y', or 'go to my drive'."
+            )
 
         else:
-            print("I can help with: listing files, creating folders, searching, and going to Drive.")
-            print("Try something like: 'create folder Experiments' or 'search for invoices'.")
+            print(
+                "I can help with: listing files, creating folders, searching, and going to Drive."
+            )
+            print(
+                "Try something like: 'create folder Experiments' or 'search for invoices'."
+            )
 
 
 if __name__ == "__main__":

@@ -27,23 +27,29 @@ See README.md for full positioning and quick start.
 """
 
 from playwright.sync_api import sync_playwright
-from typing import Optional, Any, Iterable, Set
-import json
+from typing import Optional, Any, Iterable
 import time
 
+
 class WebBrowserConnector:
-    def __init__(self, headless: bool = True, cdp_url: Optional[str] = None, reuse_page: bool = True,
-                 auto_indicator: bool = False, indicator_label: str = "🐼 Grok",
-                 indicator_actions: Optional[Iterable[str]] = None):
+    def __init__(
+        self,
+        headless: bool = True,
+        cdp_url: Optional[str] = None,
+        reuse_page: bool = True,
+        auto_indicator: bool = False,
+        indicator_label: str = "🐼 Grok",
+        indicator_actions: Optional[Iterable[str]] = None,
+    ):
         """
         Args:
             headless: Used only when launching a new browser (not CDP).
             cdp_url: If provided, connect to an existing Chrome via CDP.
-            reuse_page: 
+            reuse_page:
                 - True (default): In CDP mode, try to reuse an existing page/tab instead of always opening a new blank one.
                   This prevents the "new blank tabs keep opening" problem.
                 - False: Always create a fresh new tab (old behavior).
-            auto_indicator: If True, automatically show the glowing panda "searching" indicator 
+            auto_indicator: If True, automatically show the glowing panda "searching" indicator
                            during the actions listed in `indicator_actions`.
             indicator_label: Text shown next to the panda when using auto_indicator.
             indicator_actions: Set of method names that should trigger the searching indicator automatically.
@@ -62,7 +68,11 @@ class WebBrowserConnector:
 
         if cdp_url:
             self.browser = self.pw.chromium.connect_over_cdp(cdp_url)
-            self.context = self.browser.contexts[0] if self.browser.contexts else self.browser.new_context()
+            self.context = (
+                self.browser.contexts[0]
+                if self.browser.contexts
+                else self.browser.new_context()
+            )
 
             if reuse_page and self.context.pages:
                 # Reuse the last active page instead of spamming new blank tabs
@@ -90,7 +100,9 @@ class WebBrowserConnector:
         finally:
             self._hide_indicator("click")
 
-    def select_option(self, option: str, container: Optional[str] = None, timeout: int = 8000) -> None:
+    def select_option(
+        self, option: str, container: Optional[str] = None, timeout: int = 8000
+    ) -> None:
         """
         Robust "click to select" for dropdowns, menus, radio groups, and custom lists.
 
@@ -132,8 +144,12 @@ class WebBrowserConnector:
                 lambda: self.page.get_by_role("option", name=option),
                 lambda: self.page.get_by_text(option, exact=False),
                 lambda: self.page.locator(f"button:has-text('{option}')"),
-                lambda: self.page.locator(f"[role*='menuitem']:has-text('{option}'), [role*='option']:has-text('{option}')"),
-                lambda: self.page.locator(f"li:has-text('{option}'), div[role='option']:has-text('{option}')"),
+                lambda: self.page.locator(
+                    f"[role*='menuitem']:has-text('{option}'), [role*='option']:has-text('{option}')"
+                ),
+                lambda: self.page.locator(
+                    f"li:has-text('{option}'), div[role='option']:has-text('{option}')"
+                ),
             ]
 
             clicked = False
@@ -223,28 +239,29 @@ class WebBrowserConnector:
         tabs = []
         for i, p in enumerate(self.context.pages):
             try:
-                tabs.append({
-                    "index": i,
-                    "url": p.url,
-                    "title": p.title(),
-                    "is_current": p == self.page
-                })
+                tabs.append(
+                    {
+                        "index": i,
+                        "url": p.url,
+                        "title": p.title(),
+                        "is_current": p == self.page,
+                    }
+                )
             except Exception:
-                tabs.append({
-                    "index": i,
-                    "url": "about:blank",
-                    "title": "<error reading tab>",
-                    "is_current": False
-                })
+                tabs.append(
+                    {
+                        "index": i,
+                        "url": "about:blank",
+                        "title": "<error reading tab>",
+                        "is_current": False,
+                    }
+                )
         return tabs
 
     def get_current_tab(self) -> dict:
         """Return info about the currently active tab."""
         try:
-            return {
-                "url": self.page.url,
-                "title": self.page.title()
-            }
+            return {"url": self.page.url, "title": self.page.title()}
         except Exception:
             return {"url": self.page.url, "title": "<error>"}
 
@@ -254,7 +271,9 @@ class WebBrowserConnector:
         if 0 <= index < len(pages):
             self.page = pages[index]
             return self.page.url
-        raise IndexError(f"Tab index {index} out of range (0-{len(pages)-1}). Use get_tabs() first.")
+        raise IndexError(
+            f"Tab index {index} out of range (0-{len(pages)-1}). Use get_tabs() first."
+        )
 
     def switch_to_tab_by_url(self, url_contains: str) -> str:
         """Switch to the first tab whose URL contains the given string. Returns the URL or raises if not found."""
@@ -262,7 +281,9 @@ class WebBrowserConnector:
             if url_contains.lower() in p.url.lower():
                 self.page = p
                 return p.url
-        raise ValueError(f"No tab found containing '{url_contains}' in URL. Use get_tabs().")
+        raise ValueError(
+            f"No tab found containing '{url_contains}' in URL. Use get_tabs()."
+        )
 
     def new_tab(self, url: Optional[str] = None) -> str:
         """Open a new tab (and optionally navigate to a URL). Switches active page to the new tab."""
@@ -534,7 +555,12 @@ class WebBrowserConnector:
         except Exception:
             return False
 
-    def wait_for_navigation(self, url_pattern: str = "**/*", timeout: int = 30000, wait_until: str = "domcontentloaded") -> str:
+    def wait_for_navigation(
+        self,
+        url_pattern: str = "**/*",
+        timeout: int = 30000,
+        wait_until: str = "domcontentloaded",
+    ) -> str:
         """
         Wait for a navigation to complete (or until the URL matches the pattern).
         Very useful after clicking buttons/links that cause page changes.
@@ -550,7 +576,9 @@ class WebBrowserConnector:
         self._show_searching_indicator("wait_for_navigation")
         try:
             try:
-                self.page.wait_for_url(url_pattern, timeout=timeout, wait_until=wait_until)
+                self.page.wait_for_url(
+                    url_pattern, timeout=timeout, wait_until=wait_until
+                )
             except Exception:
                 # Fallback: still return current URL even if pattern didn't match in time
                 pass
@@ -565,7 +593,9 @@ class WebBrowserConnector:
     def get_links(self) -> list[str]:
         """Return all href links on the current page."""
         try:
-            return self.page.eval_on_selector_all("a[href]", "els => els.map(e => e.href)")
+            return self.page.eval_on_selector_all(
+                "a[href]", "els => els.map(e => e.href)"
+            )
         except Exception:
             return []
 
@@ -586,7 +616,7 @@ class WebBrowserConnector:
         Export cookies + localStorage + sessionStorage to a JSON file.
         Useful for persisting logins across sessions or sharing auth with agents.
         """
-        state = self.context.storage_state(path=path)
+        self.context.storage_state(path=path)
         return path
 
     def load_storage_state(self, path: str = "auth_state.json") -> None:
@@ -594,7 +624,9 @@ class WebBrowserConnector:
         Load previously saved cookies/storage state into the current context.
         Note: Works best when creating a fresh context. In CDP mode this may have limited effect.
         """
-        self.context.add_cookies([])  # no-op placeholder; real load usually happens at context creation
+        self.context.add_cookies(
+            []
+        )  # no-op placeholder; real load usually happens at context creation
         # For CDP connected contexts, we recommend the user logs in manually once
         # and then uses save_storage_state for backup.
 
@@ -645,7 +677,7 @@ class WebBrowserConnector:
                 document.body.appendChild(el);
             }}
 
-            el.innerHTML = '';
+            el.textContent = '';
             const panda = document.createElement('span');
             panda.style.fontSize = '15px';
             panda.style.lineHeight = '1';
@@ -700,7 +732,9 @@ class WebBrowserConnector:
         else:
             self.hide_glowing_panda()
 
-    def enable_auto_indicator(self, label: Optional[str] = None, actions: Optional[Iterable[str]] = None):
+    def enable_auto_indicator(
+        self, label: Optional[str] = None, actions: Optional[Iterable[str]] = None
+    ):
         """Enable automatic searching panda during configured actions."""
         self._auto_indicator = True
         if label:
@@ -717,16 +751,24 @@ class WebBrowserConnector:
 
     def _show_searching_indicator(self, action: str = None):
         """Internal: Show the searching variant if auto_indicator is enabled for this action."""
-        if getattr(self, '_auto_indicator', False):
-            actions = getattr(self, '_indicator_actions', {"goto", "new_tab", "reload", "wait_for_navigation"})
+        if getattr(self, "_auto_indicator", False):
+            actions = getattr(
+                self,
+                "_indicator_actions",
+                {"goto", "new_tab", "reload", "wait_for_navigation"},
+            )
             if action is None or action in actions:
-                label = getattr(self, '_indicator_label', "🐼 Grok")
+                label = getattr(self, "_indicator_label", "🐼 Grok")
                 self.show_glowing_panda(label, mode="searching")
 
     def _hide_indicator(self, action: str = None):
         """Internal: Hide indicator if auto_indicator is enabled for this action."""
-        if getattr(self, '_auto_indicator', False):
-            actions = getattr(self, '_indicator_actions', {"goto", "new_tab", "reload", "wait_for_navigation"})
+        if getattr(self, "_auto_indicator", False):
+            actions = getattr(
+                self,
+                "_indicator_actions",
+                {"goto", "new_tab", "reload", "wait_for_navigation"},
+            )
             if action is None or action in actions:
                 self.hide_glowing_panda()
 
@@ -741,11 +783,13 @@ class WebBrowserConnector:
     def __exit__(self, *args):
         self.close()
 
+
 # =============================================================================
 # CLI for Commanding Web Navigation (designed for agents / Grok tool use)
 # =============================================================================
 
-def _get_connector(args) -> 'WebBrowserConnector':
+
+def _get_connector(args) -> "WebBrowserConnector":
     """
     Smart connector factory.
 
@@ -756,8 +800,8 @@ def _get_connector(args) -> 'WebBrowserConnector':
     """
     import socket
 
-    cdp_url = getattr(args, 'cdp_url', None) or "http://localhost:9222"
-    force_cdp = getattr(args, 'cdp', False) or getattr(args, 'live', False)
+    cdp_url = getattr(args, "cdp_url", None) or "http://localhost:9222"
+    force_cdp = getattr(args, "cdp", False) or getattr(args, "live", False)
 
     def _is_port_open(host: str, port: int, timeout: float = 0.8) -> bool:
         try:
@@ -771,21 +815,25 @@ def _get_connector(args) -> 'WebBrowserConnector':
     except Exception:
         port = 9222
 
-    reuse = not getattr(args, 'new_tab', False)
-    auto_ind = getattr(args, 'auto_indicator', False)
-    ind_label = getattr(args, 'indicator_label', "🐼 Grok")
-    ind_actions_str = getattr(args, 'indicator_actions', "")
+    reuse = not getattr(args, "new_tab", False)
+    auto_ind = getattr(args, "auto_indicator", False)
+    ind_label = getattr(args, "indicator_label", "🐼 Grok")
+    ind_actions_str = getattr(args, "indicator_actions", "")
     ind_actions = None
     if ind_actions_str:
         ind_actions = {a.strip() for a in ind_actions_str.split(",") if a.strip()}
 
     if force_cdp or _is_port_open("127.0.0.1", port):
-        return WebBrowserConnector(cdp_url=cdp_url, reuse_page=reuse,
-                                   auto_indicator=auto_ind, indicator_label=ind_label,
-                                   indicator_actions=ind_actions)
+        return WebBrowserConnector(
+            cdp_url=cdp_url,
+            reuse_page=reuse,
+            auto_indicator=auto_ind,
+            indicator_label=ind_label,
+            indicator_actions=ind_actions,
+        )
 
     # Fallback to new headless browser
-    headless = not getattr(args, 'visible', False)
+    headless = not getattr(args, "visible", False)
     return WebBrowserConnector(headless=headless, reuse_page=False)
 
 
@@ -793,6 +841,7 @@ def _print_result(data, use_json: bool):
     """Print result in human or JSON format."""
     if use_json:
         import json
+
         print(json.dumps(data, indent=2, ensure_ascii=False))
     else:
         if isinstance(data, dict):
@@ -851,29 +900,53 @@ Examples:
   python browser_connector.py click "text=Sign in"
   python browser_connector.py execute-script "return document.title" --json
         """,
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     # Global options
-    parser.add_argument("--cdp", "--live", action="store_true",
-                        help="Force connection to a running Chrome debug session (real logged-in browser). Usually not needed — auto-detection is enabled.")
-    parser.add_argument("--cdp-url", default="http://localhost:9222",
-                        help="Custom CDP URL (default: http://localhost:9222)")
-    parser.add_argument("--visible", action="store_true",
-                        help="Run with visible browser (only for new instances)")
-    parser.add_argument("--json", action="store_true",
-                        help="Output results as JSON (ideal for agents)")
-    parser.add_argument("--timeout", type=int, default=30000,
-                        help="Default timeout for actions in ms")
-    parser.add_argument("--new-tab", action="store_true",
-                        help="Force creation of a new tab (default behavior in CDP mode is to reuse the current tab to avoid spam)")
-    parser.add_argument("--auto-indicator", action="store_true",
-                        help="Automatically show the glowing 🐼 searching indicator during navigation actions")
-    parser.add_argument("--indicator-label", default="🐼 Grok",
-                        help="Label to use with --auto-indicator (default: '🐼 Grok')")
-    parser.add_argument("--indicator-actions", default="",
-                        help="Comma-separated list of actions that should trigger the auto-indicator "
-                             "(e.g. 'goto,new_tab,reload'). Defaults to navigation actions.")
+    parser.add_argument(
+        "--cdp",
+        "--live",
+        action="store_true",
+        help="Force connection to a running Chrome debug session (real logged-in browser). Usually not needed — auto-detection is enabled.",
+    )
+    parser.add_argument(
+        "--cdp-url",
+        default="http://localhost:9222",
+        help="Custom CDP URL (default: http://localhost:9222)",
+    )
+    parser.add_argument(
+        "--visible",
+        action="store_true",
+        help="Run with visible browser (only for new instances)",
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Output results as JSON (ideal for agents)"
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=30000, help="Default timeout for actions in ms"
+    )
+    parser.add_argument(
+        "--new-tab",
+        action="store_true",
+        help="Force creation of a new tab (default behavior in CDP mode is to reuse the current tab to avoid spam)",
+    )
+    parser.add_argument(
+        "--auto-indicator",
+        action="store_true",
+        help="Automatically show the glowing 🐼 searching indicator during navigation actions",
+    )
+    parser.add_argument(
+        "--indicator-label",
+        default="🐼 Grok",
+        help="Label to use with --auto-indicator (default: '🐼 Grok')",
+    )
+    parser.add_argument(
+        "--indicator-actions",
+        default="",
+        help="Comma-separated list of actions that should trigger the auto-indicator "
+        "(e.g. 'goto,new_tab,reload'). Defaults to navigation actions.",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Action to perform")
 
@@ -888,10 +961,20 @@ Examples:
     p.add_argument("selector", help="CSS selector, text=, role=, etc.")
 
     # select - dedicated "click to select" for dropdowns, menus, lists (GitHub-style forms etc.)
-    p = subparsers.add_parser("select", help="Select an option by clicking it (robust for custom dropdowns/menus)")
-    p.add_argument("option", help="Visible text of the option to select (e.g. 'MIT License', 'Python')")
-    p.add_argument("--container", "--in", dest="container",
-                   help="Optional dropdown/menu trigger (text or selector) to click first to open it")
+    p = subparsers.add_parser(
+        "select",
+        help="Select an option by clicking it (robust for custom dropdowns/menus)",
+    )
+    p.add_argument(
+        "option",
+        help="Visible text of the option to select (e.g. 'MIT License', 'Python')",
+    )
+    p.add_argument(
+        "--container",
+        "--in",
+        dest="container",
+        help="Optional dropdown/menu trigger (text or selector) to click first to open it",
+    )
 
     # fill
     p = subparsers.add_parser("fill", help="Fill an input/textarea")
@@ -913,11 +996,15 @@ Examples:
     p.add_argument("selector")
 
     # execute-script (or eval)
-    p = subparsers.add_parser("execute-script", aliases=["eval", "js"], help="Execute JavaScript")
+    p = subparsers.add_parser(
+        "execute-script", aliases=["eval", "js"], help="Execute JavaScript"
+    )
     p.add_argument("script", help="JavaScript code to run")
 
     # wait-for-navigation
-    p = subparsers.add_parser("wait-for-navigation", help="Wait for navigation to complete")
+    p = subparsers.add_parser(
+        "wait-for-navigation", help="Wait for navigation to complete"
+    )
     p.add_argument("pattern", nargs="?", default="**/*")
 
     # tabs / get-tabs
@@ -932,13 +1019,29 @@ Examples:
     p.add_argument("url", nargs="?")
 
     # Keyboard shortcuts for browser navigation
-    p = subparsers.add_parser("shortcut", help="Send a keyboard shortcut (e.g. 'Control+L', 'Control+T', 'Alt+Left')")
-    p.add_argument("keys", help="Key combination to press (e.g. Control+T, Meta+Shift+T, Alt+Left, F5)")
+    p = subparsers.add_parser(
+        "shortcut",
+        help="Send a keyboard shortcut (e.g. 'Control+L', 'Control+T', 'Alt+Left')",
+    )
+    p.add_argument(
+        "keys",
+        help="Key combination to press (e.g. Control+T, Meta+Shift+T, Alt+Left, F5)",
+    )
 
     # Common convenience shortcut commands
-    p = subparsers.add_parser("focus-address", aliases=["address-bar"], help="Focus the address bar (Ctrl/Cmd + L)")
-    p = subparsers.add_parser("reload-shortcut", aliases=["hard-reload"], help="Reload page (Ctrl+R). Use --hard for Ctrl+Shift+R")
-    p.add_argument("--hard", action="store_true", help="Perform hard reload (bypass cache)")
+    p = subparsers.add_parser(
+        "focus-address",
+        aliases=["address-bar"],
+        help="Focus the address bar (Ctrl/Cmd + L)",
+    )
+    p = subparsers.add_parser(
+        "reload-shortcut",
+        aliases=["hard-reload"],
+        help="Reload page (Ctrl+R). Use --hard for Ctrl+Shift+R",
+    )
+    p.add_argument(
+        "--hard", action="store_true", help="Perform hard reload (bypass cache)"
+    )
     p = subparsers.add_parser("back", help="Go back in history (Alt+Left)")
     p = subparsers.add_parser("forward", help="Go forward in history (Alt+Right)")
 
@@ -955,8 +1058,11 @@ Examples:
     p = subparsers.add_parser("zoom-reset", help="Reset Zoom (Ctrl+0)")
 
     # Discovery command for agents
-    p = subparsers.add_parser("list-shortcuts", aliases=["shortcuts", "keyboard-help"],
-                              help="List all supported keyboard shortcuts (great for agents)")
+    p = subparsers.add_parser(
+        "list-shortcuts",
+        aliases=["shortcuts", "keyboard-help"],
+        help="List all supported keyboard shortcuts (great for agents)",
+    )
 
     # close-tab
     p = subparsers.add_parser("close-tab", help="Close a tab (current if no index)")
@@ -978,36 +1084,111 @@ Examples:
     p = subparsers.add_parser("scroll-bottom", help="Scroll to bottom of page")
 
     # launch-browser - helper to start the real logged-in Chrome debug session
-    p = subparsers.add_parser("launch-browser", aliases=["start-chrome", "launch-chrome"],
-                              help="Launch a Chrome debug session with a persistent profile (best for real logged-in browser control)")
+    p = subparsers.add_parser(
+        "launch-browser",
+        aliases=["start-chrome", "launch-chrome"],
+        help="Launch a Chrome debug session with a persistent profile (best for real logged-in browser control)",
+    )
 
     # status / info
-    p = subparsers.add_parser("status", aliases=["info"], help="Show current connection status and whether a real browser is attached")
+    p = subparsers.add_parser(
+        "status",
+        aliases=["info"],
+        help="Show current connection status and whether a real browser is attached",
+    )
 
     # save-auth
-    p = subparsers.add_parser("save-auth", help="Save cookies + storage state to a file (backup your logged-in session)")
+    p = subparsers.add_parser(
+        "save-auth",
+        help="Save cookies + storage state to a file (backup your logged-in session)",
+    )
     p.add_argument("path", nargs="?", default="auth_state.json")
 
     # cookies
-    p = subparsers.add_parser("cookies", help="Show cookies for a domain (debug logged-in state)")
+    p = subparsers.add_parser(
+        "cookies", help="Show cookies for a domain (debug logged-in state)"
+    )
     p.add_argument("domain", nargs="?", default="")
 
     # Indicator commands for when Grok is actively using the browser
-    p = subparsers.add_parser("show-indicator", help="Show glowing 🐼 indicator in corner (signals Grok is active)")
+    p = subparsers.add_parser(
+        "show-indicator",
+        help="Show glowing 🐼 indicator in corner (signals Grok is active)",
+    )
     p.add_argument("--label", default="🐼 Grok", help="Custom text next to the panda")
 
-    p = subparsers.add_parser("hide-indicator", help="Remove the glowing panda indicator")
+    p = subparsers.add_parser(
+        "hide-indicator", help="Remove the glowing panda indicator"
+    )
 
     # Demo command - runs a realistic web navigation example with the configurable searching indicator
-    p = subparsers.add_parser("demo", help="Run a realistic web navigation demo with automatic glowing searching panda")
+    p = subparsers.add_parser(
+        "demo",
+        help="Run a realistic web navigation demo with automatic glowing searching panda",
+    )
     p.add_argument("--label", default="🐼 Grok", help="Label for the auto indicator")
-    p.add_argument("--actions", default="goto,new_tab,wait_for_navigation",
-                   help="Comma-separated list of actions that should trigger the searching indicator")
+    p.add_argument(
+        "--actions",
+        default="goto,new_tab,wait_for_navigation",
+        help="Comma-separated list of actions that should trigger the searching indicator",
+    )
 
     # Support simple mode: python browser_connector.py https://example.com
-    if len(sys.argv) > 1 and not sys.argv[1].startswith('-') and sys.argv[1] not in ['goto','click','select','fill','type','screenshot','extract-text','execute-script','eval','js','wait-for-navigation','tabs','get-tabs','switch-tab','new-tab','close-tab','title','url','links','reload','scroll-bottom','show-indicator','hide-indicator','launch-browser','status','demo','shortcut','focus-address','address-bar','reload-shortcut','hard-reload','back','forward','devtools','console','history','bookmarks','downloads','view-source','fullscreen','zoom-in','zoom-out','zoom-reset','list-shortcuts','shortcuts','keyboard-help']:
+    if (
+        len(sys.argv) > 1
+        and not sys.argv[1].startswith("-")
+        and sys.argv[1]
+        not in [
+            "goto",
+            "click",
+            "select",
+            "fill",
+            "type",
+            "screenshot",
+            "extract-text",
+            "execute-script",
+            "eval",
+            "js",
+            "wait-for-navigation",
+            "tabs",
+            "get-tabs",
+            "switch-tab",
+            "new-tab",
+            "close-tab",
+            "title",
+            "url",
+            "links",
+            "reload",
+            "scroll-bottom",
+            "show-indicator",
+            "hide-indicator",
+            "launch-browser",
+            "status",
+            "demo",
+            "shortcut",
+            "focus-address",
+            "address-bar",
+            "reload-shortcut",
+            "hard-reload",
+            "back",
+            "forward",
+            "devtools",
+            "console",
+            "history",
+            "bookmarks",
+            "downloads",
+            "view-source",
+            "fullscreen",
+            "zoom-in",
+            "zoom-out",
+            "zoom-reset",
+            "list-shortcuts",
+            "shortcuts",
+            "keyboard-help",
+        ]
+    ):
         # Looks like a bare URL - inject 'goto' command
-        sys.argv.insert(1, 'goto')
+        sys.argv.insert(1, "goto")
 
     args = parser.parse_args()
 
@@ -1037,10 +1218,14 @@ Examples:
             result = {
                 "status": "selected",
                 "option": args.option,
-                "container": getattr(args, "container", None)
+                "container": getattr(args, "container", None),
             }
             if not use_json:
-                c = f" (in {args.container})" if getattr(args, "container", None) else ""
+                c = (
+                    f" (in {args.container})"
+                    if getattr(args, "container", None)
+                    else ""
+                )
                 print(f"Selected option: {args.option}{c}")
 
         elif args.command == "fill":
@@ -1058,12 +1243,19 @@ Examples:
                 print(f"Screenshot saved to: {path}")
 
         elif args.command == "extract-text":
-            text = conn.extract_text_safe(args.selector) or conn.extract_text(args.selector)
+            text = conn.extract_text_safe(args.selector) or conn.extract_text(
+                args.selector
+            )
             result = {"selector": args.selector, "text": text}
 
         elif args.command in ("execute-script", "eval", "js"):
             script_result = conn.execute_script(args.script)
-            result = {"result": script_result, "script": args.script[:100] + "..." if len(args.script) > 100 else args.script}
+            result = {
+                "result": script_result,
+                "script": (
+                    args.script[:100] + "..." if len(args.script) > 100 else args.script
+                ),
+            }
 
         elif args.command == "wait-for-navigation":
             final_url = conn.wait_for_navigation(args.pattern, timeout=args.timeout)
@@ -1177,12 +1369,13 @@ Examples:
             # This command launches Chrome outside of Python (best effort)
             import subprocess
             import os
+
             profile_dir = os.path.expanduser("~/.grok-browser-profile")
             os.makedirs(profile_dir, exist_ok=True)
 
             cmd = [
                 "google-chrome-stable",
-                f"--remote-debugging-port=9222",
+                "--remote-debugging-port=9222",
                 f"--user-data-dir={profile_dir}",
                 "--no-first-run",
                 "--no-default-browser-check",
@@ -1190,15 +1383,19 @@ Examples:
                 "--disable-extensions-except=",
                 "--disable-sync",
             ]
-            print(f"Launching Chrome debug session with persistent profile at: {profile_dir}")
+            print(
+                f"Launching Chrome debug session with persistent profile at: {profile_dir}"
+            )
             print("Command:", " ".join(cmd))
             try:
-                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(
+                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
                 result = {
                     "status": "launched",
                     "profile": profile_dir,
                     "remote_debugging": "http://localhost:9222",
-                    "note": "Log into your accounts in this Chrome window. Then use --cdp (or no flag) to let agents control it."
+                    "note": "Log into your accounts in this Chrome window. Then use --cdp (or no flag) to let agents control it.",
                 }
             except FileNotFoundError:
                 result = {"error": "google-chrome-stable not found in PATH"}
@@ -1207,7 +1404,8 @@ Examples:
 
         elif args.command in ("status", "info"):
             import socket
-            cdp_url = getattr(args, 'cdp_url', None) or "http://localhost:9222"
+
+            cdp_url = getattr(args, "cdp_url", None) or "http://localhost:9222"
             try:
                 port = int(cdp_url.rsplit(":", 1)[-1].split("/")[0])
             except Exception:
@@ -1223,8 +1421,12 @@ Examples:
             result = {
                 "cdp_url": cdp_url,
                 "debug_port_listening": is_connected,
-                "mode": "CDP (real logged-in browser)" if is_connected else "Headless (new instance)",
-                "recommendation": "Use --cdp (or just run commands) when you want the agent to control your already-logged-in browser."
+                "mode": (
+                    "CDP (real logged-in browser)"
+                    if is_connected
+                    else "Headless (new instance)"
+                ),
+                "recommendation": "Use --cdp (or just run commands) when you want the agent to control your already-logged-in browser.",
             }
 
             if is_connected:
@@ -1237,10 +1439,17 @@ Examples:
 
         elif args.command == "save-auth":
             path = conn.save_storage_state(args.path)
-            result = {"saved_to": path, "note": "This file contains cookies and storage. Keep it secure."}
+            result = {
+                "saved_to": path,
+                "note": "This file contains cookies and storage. Keep it secure.",
+            }
 
         elif args.command == "cookies":
-            cookies = conn.get_cookies_for_domain(args.domain) if args.domain else conn.get_cookies()[:20]
+            cookies = (
+                conn.get_cookies_for_domain(args.domain)
+                if args.domain
+                else conn.get_cookies()[:20]
+            )
             result = {"cookies": cookies, "count": len(cookies)}
 
         elif args.command == "show-indicator":
@@ -1255,15 +1464,17 @@ Examples:
             # Self-contained realistic demo (works reliably from CLI)
             actions = [a.strip() for a in args.actions.split(",") if a.strip()]
             print("=== Web Navigation Demo with Searching Panda ===")
-            cdp = getattr(args, 'cdp_url', None) or "http://localhost:9222"
+            cdp = getattr(args, "cdp_url", None) or "http://localhost:9222"
             conn = WebBrowserConnector(
                 cdp_url=cdp,
                 auto_indicator=True,
                 indicator_label=args.label,
-                indicator_actions=set(actions)
+                indicator_actions=set(actions),
             )
             try:
-                print("\n[1] Navigating to Google (searching indicator should appear)...")
+                print(
+                    "\n[1] Navigating to Google (searching indicator should appear)..."
+                )
                 conn.goto("https://www.google.com")
                 print(f"     Title: {conn.get_title()}")
 
@@ -1273,11 +1484,15 @@ Examples:
                 conn.wait_for_navigation("**/search**")
                 print(f"     Results: {conn.get_title()}")
 
-                print("\n[3] Opening another tab (indicator will show if configured)...")
+                print(
+                    "\n[3] Opening another tab (indicator will show if configured)..."
+                )
                 conn.new_tab("https://x.ai")
                 print(f"     New tab: {conn.get_title()}")
 
-                print("\n\u2705 Demo complete. The searching variant appeared automatically on the configured actions.")
+                print(
+                    "\n\u2705 Demo complete. The searching variant appeared automatically on the configured actions."
+                )
             finally:
                 pass  # Never close the user's real browser in CDP mode
             result = {"status": "demo completed"}
@@ -1299,7 +1514,7 @@ Examples:
     finally:
         if conn:
             # In CDP mode we usually don't want to close the whole browser
-            if not (getattr(args, 'cdp', False) or getattr(args, 'live', False)):
+            if not (getattr(args, "cdp", False) or getattr(args, "live", False)):
                 try:
                     conn.close()
                 except Exception:
@@ -1314,10 +1529,13 @@ if __name__ == "__main__":
 # Web Navigation Example with Configurable Auto Indicator
 # =============================================================================
 
-def web_navigation_example(cdp_url: str = "http://localhost:9222",
-                           auto_indicator: bool = True,
-                           indicator_label: str = "🐼 Grok",
-                           indicator_actions: Optional[Iterable[str]] = None):
+
+def web_navigation_example(
+    cdp_url: str = "http://localhost:9222",
+    auto_indicator: bool = True,
+    indicator_label: str = "🐼 Grok",
+    indicator_actions: Optional[Iterable[str]] = None,
+):
     """
     Realistic web navigation example using the connector with the glowing searching indicator.
 
@@ -1346,7 +1564,7 @@ def web_navigation_example(cdp_url: str = "http://localhost:9222",
         cdp_url=cdp_url,
         auto_indicator=auto_indicator,
         indicator_label=indicator_label,
-        indicator_actions=indicator_actions
+        indicator_actions=indicator_actions,
     )
 
     try:
