@@ -288,23 +288,32 @@ CRITICAL RULES:
                     obs = self.execute_action(action)
 
                     if "image_base64" in obs:
-                        self.conversation.append(
-                            {
-                                "role": "user",
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": f"Observation after {action['action']}: {obs.get('observation', '')}",
-                                    },
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": f"data:image/png;base64,{obs['image_base64']}"
+                        if self.backend == "ollama":
+                            self.conversation.append(
+                                {
+                                    "role": "user",
+                                    "content": f"Observation after {action['action']}: {obs.get('observation', '')}",
+                                    "images": [obs["image_base64"]],
+                                }
+                            )
+                        else:
+                            self.conversation.append(
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": f"Observation after {action['action']}: {obs.get('observation', '')}",
                                         },
-                                    },
-                                ],
-                            }
-                        )
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": f"data:image/png;base64,{obs['image_base64']}"
+                                            },
+                                        },
+                                    ],
+                                }
+                            )
                     else:
                         self.conversation.append(
                             {
