@@ -20,22 +20,22 @@ The LLM uses the rich, discoverable, keyboard-friendly surface (`list_keyboard_s
 
 ## Flagship Feature: LLM Chat
 
-The main way to use the project is `llm_chat.py` — a conversational interface where an LLM directly controls your real browser.
+The main way to use the project is `llm_chat.py` \u2014 a conversational interface where an LLM directly controls your real browser.
 
 ```bash
 # Ollama (recommended)
 python llm_chat.py --model llama3.1
 
 # OpenAI-compatible (vLLM, LM Studio, OpenRouter, etc.)
-python llm_chat.py --backend openai --base-url http://localhost:8000/v1 --model Qwen2.5-32B
+python llm_chat.py --backend openai --base-url http://localhost:8000/v1 --model gpt-4o-mini
 ```
 
 **Current capabilities:**
 - Clean JSON action format (highly reliable)
 - Multi-backend support (Ollama + any OpenAI-compatible server)
+- **Real vision support** \u2014 screenshots are sent as images to vision models (gpt-4o, llava, etc.)
 - Automatic glowing panda during execution
 - Strong self-discovery (`list_keyboard_shortcuts`)
-- Screenshot + observation feedback
 - Full toolkit access (`select_option`, keyboard control, etc.)
 
 The LLM receives rich observations after every action and can perform complex, multi-step automations.
@@ -65,13 +65,17 @@ Then just describe what you want done on the web. The agent will drive the brows
 
 ## Examples
 
-See the `examples/` directory for runnable demonstrations, including `examples/llm_browser_agent.py`.
+See the `examples/` directory for runnable demonstrations:
+- `examples/llm_browser_agent.py` \u2014 General LLM agent
+- `examples/github_repo_creator_agent.py` \u2014 Complex multi-step form automation (the exact flow used to create this repo)
+
+Vision-capable models (gpt-4o, llava, etc.) automatically receive screenshots when the agent calls the `screenshot` action.
 
 ## Browser Assistant Swarm Connection
 
 This project draws heavily from the [browser-assistant-swarm](https://github.com/kwizzlesurp10-ctrl/browser-assistant-swarm) / OpenComet architecture:
 
-- Real browser as a first-class tool for agents
+- Real browser as a first-class agent tool
 - Strong observability and structured action surface
 - Designed for multi-step, long-horizon automation loops
 - Excellent backend for local LLM + LangGraph browser agents
