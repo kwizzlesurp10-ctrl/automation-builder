@@ -31,7 +31,7 @@ def main():
     conn = WebBrowserConnector(
         cdp_url="http://localhost:9222",
         auto_indicator=True,           # Show the panda while acting
-        indicator_label="\ud83d\udc3c Selecting",
+        indicator_label="🐼 Selecting",
     )
 
     print("Connected to browser.")

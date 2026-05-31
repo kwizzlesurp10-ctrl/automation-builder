@@ -1,80 +1,29 @@
 #!/usr/bin/env python3
 """
-Playwright Web Browser Connector
-Minimal sync browser automation for agents / Grok.
-Supports launching Chromium or connecting to an existing Chrome session via CDP
-(for full control of a visible browser with your cookies/logins).
+Automation Builder
+
+Powerful browser automation and agent control plane.
+
+Powered by CDP-connected Playwright (your real logged-in Chrome),
+visual observability (glowing panda), keyboard-level control,
+and swarm-style agent patterns inspired by browser-assistant-swarm.
 
 Key features:
-- goto, click, fill, type, extract, evaluate, execute_script, screenshot, cookies
-- **select_option** — robust "click to select" for dropdowns/menus (the real-world pattern)
-- Full tab management (get_tabs, switch_to_tab, new_tab, close_tab, etc.)
-- Rich keyboard navigation support + `list_keyboard_shortcuts()` for agent discovery
-- Waiting helpers: wait_for_selector, wait_for_navigation
-- Works great in both headless and live CDP mode
-- Sync API, easy to expose as tools
-- CLI support for "select" (click-based option selection) and "click"
+- Full CDP real-logged-in browser control with smart tab reuse
+- goto, click, fill, type, select_option (robust dropdown/menu selection), execute_script, etc.
+- Visual glowing 🐼 panda indicator (active + searching modes) with configurable auto-trigger
+- Rich keyboard navigation + `list_keyboard_shortcuts()` for agent self-discovery
+- Tab management, wait_for_navigation, robust locators
+- Excellent CLI (with --cdp, --json, --auto-indicator) + clean Python API
+- Works great as tools for local LLMs and swarm-style agents
+
+This is the core library behind the Automation Builder project.
 
 Install:
   pip install playwright
   playwright install chromium
 
-Basic usage:
-  from browser_connector import WebBrowserConnector
-  conn = WebBrowserConnector(headless=True)
-  conn.goto("https://example.com")
-  print(conn.get_title())
-  conn.close()
-
-Real logged-in browser (strongly recommended for agents):
-
-Grok can discover all available keyboard navigation options:
-```python
-conn = WebBrowserConnector(cdp_url="http://localhost:9222")
-shortcuts = conn.list_keyboard_shortcuts()   # Ask this first!
-conn.keyboard_shortcut("Control+L")          # Then use them naturally
-```
-
-Example with automatic searching indicator during web navigation:
-
-```python
-from browser_connector import WebBrowserConnector
-import time
-
-# Connect to your real logged-in Chrome (started with launch-browser)
-conn = WebBrowserConnector(
-    cdp_url="http://localhost:9222",
-    auto_indicator=True,                    # Enable auto panda
-    indicator_label="\ud83d\udc3c Grok",
-    indicator_actions={"goto", "new_tab", "wait_for_navigation"}  # Configurable
-)
-
-# The glowing "searching" panda will automatically appear during these actions
-print("Navigating to Google...")
-conn.goto("https://www.google.com")
-
-print("Searching for something...")
-conn.fill("textarea[name=q]", "xAI Grok")
-conn.execute_script("document.querySelector('form').submit()")
-conn.wait_for_navigation("**/search**")
-
-print("Current page:", conn.get_title())
-print("Links found:", len(conn.get_links()))
-
-# You can also manually control it
-conn.show_glowing_panda("\ud83d\udc3c Analyzing results", mode="searching")
-time.sleep(2)
-conn.hide_glowing_panda()
-
-conn.close()  # Only closes the page in CDP mode, not your browser
-```
-
-CLI equivalent with auto indicator:
-```bash
-python browser_connector.py --auto-indicator goto https://www.google.com
-python browser_connector.py --auto-indicator --indicator-actions "goto,wait_for_navigation" \
-    wait-for-navigation "**/search**"
-```
+See README.md for full positioning and quick start.
 """
 
 from playwright.sync_api import sync_playwright
@@ -84,7 +33,7 @@ import time
 
 class WebBrowserConnector:
     def __init__(self, headless: bool = True, cdp_url: Optional[str] = None, reuse_page: bool = True,
-                 auto_indicator: bool = False, indicator_label: str = "\ud83d\udc3c Grok",
+                 auto_indicator: bool = False, indicator_label: str = "🐼 Grok",
                  indicator_actions: Optional[Iterable[str]] = None):
         """
         Args:
@@ -656,7 +605,7 @@ class WebBrowserConnector:
 
     # --- Visual Activity Indicator (Glowing Panda for when Grok is using the browser) ---
 
-    def show_glowing_panda(self, label: str = "\ud83d\udc3c Grok", mode: str = "active") -> None:
+    def show_glowing_panda(self, label: str = "🐼 Grok", mode: str = "active") -> None:
         """
         Injects a glowing panda indicator in the bottom-right corner of the current page.
         Uses safe DOM creation to work on sites with strict CSP (like GitHub).
@@ -700,7 +649,7 @@ class WebBrowserConnector:
             const panda = document.createElement('span');
             panda.style.fontSize = '15px';
             panda.style.lineHeight = '1';
-            panda.textContent = '\ud83d\udc3c';
+            panda.textContent = '🐼';
             el.appendChild(panda);
 
             const labelSpan = document.createElement('span');
@@ -744,7 +693,7 @@ class WebBrowserConnector:
         """
         self.page.evaluate(js)
 
-    def set_grok_active(self, active: bool, label: str = "\ud83d\udc3c Grok") -> None:
+    def set_grok_active(self, active: bool, label: str = "🐼 Grok") -> None:
         """Convenience method to show or hide the indicator."""
         if active:
             self.show_glowing_panda(label)
@@ -771,7 +720,7 @@ class WebBrowserConnector:
         if getattr(self, '_auto_indicator', False):
             actions = getattr(self, '_indicator_actions', {"goto", "new_tab", "reload", "wait_for_navigation"})
             if action is None or action in actions:
-                label = getattr(self, '_indicator_label', "\ud83d\udc3c Grok")
+                label = getattr(self, '_indicator_label', "🐼 Grok")
                 self.show_glowing_panda(label, mode="searching")
 
     def _hide_indicator(self, action: str = None):
@@ -824,7 +773,7 @@ def _get_connector(args) -> 'WebBrowserConnector':
 
     reuse = not getattr(args, 'new_tab', False)
     auto_ind = getattr(args, 'auto_indicator', False)
-    ind_label = getattr(args, 'indicator_label', "\ud83d\udc3c Grok")
+    ind_label = getattr(args, 'indicator_label', "🐼 Grok")
     ind_actions_str = getattr(args, 'indicator_actions', "")
     ind_actions = None
     if ind_actions_str:
@@ -876,17 +825,17 @@ def main():
 
    Even better — use the built-in demo:
    python browser_connector.py demo
-   python browser_connector.py demo --label "\ud83d\udc3c Grok" --actions "goto,wait_for_navigation"
+   python browser_connector.py demo --label "🐼 Grok" --actions "goto,wait_for_navigation"
 
    Use --new-tab if you explicitly want a fresh tab.
 
 Other useful commands:
   python browser_connector.py status
   python browser_connector.py launch-browser
-  python browser_connector.py show-indicator --label "\ud83d\udc3c Searching..."
+  python browser_connector.py show-indicator --label "🐼 Searching..."
   python browser_connector.py hide-indicator
   python browser_connector.py demo
-  python browser_connector.py demo --auto-indicator --label "\ud83d\udc3c Grok" --actions "goto,wait_for_navigation"
+  python browser_connector.py demo --auto-indicator --label "🐼 Grok" --actions "goto,wait_for_navigation"
 
 Keyboard navigation shortcuts (Grok-friendly):
   python browser_connector.py shortcut "Control+L"
@@ -919,9 +868,9 @@ Examples:
     parser.add_argument("--new-tab", action="store_true",
                         help="Force creation of a new tab (default behavior in CDP mode is to reuse the current tab to avoid spam)")
     parser.add_argument("--auto-indicator", action="store_true",
-                        help="Automatically show the glowing \ud83d\udc3c searching indicator during navigation actions")
-    parser.add_argument("--indicator-label", default="\ud83d\udc3c Grok",
-                        help="Label to use with --auto-indicator (default: '\ud83d\udc3c Grok')")
+                        help="Automatically show the glowing 🐼 searching indicator during navigation actions")
+    parser.add_argument("--indicator-label", default="🐼 Grok",
+                        help="Label to use with --auto-indicator (default: '🐼 Grok')")
     parser.add_argument("--indicator-actions", default="",
                         help="Comma-separated list of actions that should trigger the auto-indicator "
                              "(e.g. 'goto,new_tab,reload'). Defaults to navigation actions.")
@@ -1044,14 +993,14 @@ Examples:
     p.add_argument("domain", nargs="?", default="")
 
     # Indicator commands for when Grok is actively using the browser
-    p = subparsers.add_parser("show-indicator", help="Show glowing \ud83d\udc3c indicator in corner (signals Grok is active)")
-    p.add_argument("--label", default="\ud83d\udc3c Grok", help="Custom text next to the panda")
+    p = subparsers.add_parser("show-indicator", help="Show glowing 🐼 indicator in corner (signals Grok is active)")
+    p.add_argument("--label", default="🐼 Grok", help="Custom text next to the panda")
 
     p = subparsers.add_parser("hide-indicator", help="Remove the glowing panda indicator")
 
     # Demo command - runs a realistic web navigation example with the configurable searching indicator
     p = subparsers.add_parser("demo", help="Run a realistic web navigation demo with automatic glowing searching panda")
-    p.add_argument("--label", default="\ud83d\udc3c Grok", help="Label for the auto indicator")
+    p.add_argument("--label", default="🐼 Grok", help="Label for the auto indicator")
     p.add_argument("--actions", default="goto,new_tab,wait_for_navigation",
                    help="Comma-separated list of actions that should trigger the searching indicator")
 
@@ -1367,7 +1316,7 @@ if __name__ == "__main__":
 
 def web_navigation_example(cdp_url: str = "http://localhost:9222",
                            auto_indicator: bool = True,
-                           indicator_label: str = "\ud83d\udc3c Grok",
+                           indicator_label: str = "🐼 Grok",
                            indicator_actions: Optional[Iterable[str]] = None):
     """
     Realistic web navigation example using the connector with the glowing searching indicator.
